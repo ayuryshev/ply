@@ -103,7 +103,8 @@ performance.
 
 **Pipelining:**
 
-Pipelining means chaining together multiple such calls. For example:
+Pipelining means chaining together multiple Ply functions and/or methods.
+Currently only method chaining is supported. For example:
 
 ```go
 xs := []int{1, 2, 3, 4, 6, 20}
@@ -145,8 +146,9 @@ b := filtermorphfold(xs).pipe(
 However, not all methods can be pipelined. `reverse` is a good example. If
 `reverse` is the first method in the chain, then we can eliminate an
 allocation by reversing the order in which we iterate through the slice. We
-can also eliminate an allocation if `reverse` is the last method in the chain.
-But what do we do if `reverse` is in the middle? Consider this chain:
+can also eliminate an allocation if `reverse` is the last method in the chain,
+since we can reverse the result in-place. But what do we do if `reverse` is in
+the middle? Consider this chain:
 
 ```go
 xs.takeWhile(even).reverse().morph(square)
@@ -159,9 +161,9 @@ and `reverse().morph(square)`, each of which will perform an allocation.
 
 Fortunately, it is usually possible to reorder the chain such that `reverse`
 is the first or last method. In the above, we know that `morph` doesn't affect
-the length of the slice, so we can move `reverse` to the end and the result
-will be the same. Ply can't perform this reordering automatically though:
-methods may have side effects that the programmer is relying upon.
+the length or order of the slice, so we can move `reverse` to the end and the
+result will be the same. Ply can't perform this reordering automatically
+though: methods may have side effects that the programmer is relying upon.
 
 Side effects are also problematic because pipelining can change the number of
 times a function is called. For example, in this expression:
@@ -313,28 +315,33 @@ like builtins, you can't pass them around as first-class values. Fortunately
 this is a pretty rare thing to do, and it's possible to work around it in most
 cases. (For example, you can wrap the call in a `func`.)
 
-The usual codegen downsides apply as well: slower compilation, larger
-binaries, less helpful error messages. Your build process will also be more
-complicated, though hopefully less complicated than writing template code and
-using `go generate`. The fact of the matter is that *there is no silver
-bullet*: every implementation of generics has its downsides. Do your research
-before deciding whether Ply is the right approach for your project.
+Generating a specific implementation of every generic function call produces
+very fast code, at the cost of slower compilation, larger binaries, and less
+helpful error messages. Your build process will also be more complicated,
+though hopefully not as complicated as writing template code and using `go
+generate`. The fact of the matter is that *there is no silver bullet*: every
+implementation of generics has its downsides. Do your research before deciding
+whether Ply is the right approach for your project.
 
 **What if I want to define my own generic functions, though?**
 
 Sorry, that's not in the cards. The purpose of Ply is to make polymorphism as
 painless as possible. Supporting custom generics would mean defining some kind
-of template syntax, and that sucks. I believe [`gen`](https://clipperhouse.github.io/gen) lets you do that, so
-maybe check that out if you really can't live without your special-snowflake
-function. Alternatively, [open an issue](https://github.com/lukechampine/ply/issues) for your function and I'll consider
-adding it to Ply.
+of template syntax, and that sucks. Restricting the set of generic functions
+also allows the Ply compiler to apply deep optimizations, such as pipelining.
+
+I believe [`gen`](https://clipperhouse.github.io/gen) lets you write your own
+templates, so maybe check that out if you really can't live without your
+special-snowflake function. Alternatively, [open an
+issue](https://github.com/lukechampine/ply/issues) for your function and I'll
+consider adding it to Ply.
 
 **What about generic data structures?**
 
 Go seems pretty productive without them. 95% of the time, slices and maps are
 gonna perform just fine for your use case. And if you're in the 5% where
 performance is critical, it's probably worth it to write your own
-implementation.
+implementation anyway.
 
 More importantly, adding new generic data structures would complicate Go's
 syntax (do we overload `make` for our new `RedBlackTree` type?) and I really
